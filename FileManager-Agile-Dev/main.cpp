@@ -2,7 +2,9 @@
 
 int main() {
 	Scanner scanner;
-	TCHAR* path = (TCHAR*)TEXT("D:\\DOCS\\*");
-	scanner.PrintAllFilesInDirectory(path);
+
+	TCHAR* path = new TCHAR[50];
+	wsprintf(path, L"C:\\Windows");
+	scanner.DirectoryTraverse(path);
 	return 0;
 }
