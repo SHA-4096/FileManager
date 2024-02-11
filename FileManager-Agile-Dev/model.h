@@ -1,6 +1,9 @@
 #pragma once
 #include<stdio.h>
 #include<tchar.h>
+#include<windows.h>
+#include<locale.h>
+#include<queue>
 #define MAX_PATHLEN 1000
 
 class SqlScript {
@@ -15,11 +18,12 @@ private:
 
 class Node {
 public:
-	Node(TCHAR*, int, int, int);
+	Node(TCHAR*, DWORD, FILETIME, int);
 	TCHAR PathName[MAX_PATHLEN];
-	int FileAttribute;
-	int CreatedTime;
-	int Depth;
+	DWORD FileAttribute;
+	FILETIME CreatedTime;
+	int Depth;//文件树深度
+	int RealDep;//数据结构真实深度
 	Node* Child;
 	Node* Sibling;
 	Node* Parent;
@@ -27,11 +31,14 @@ public:
 
 class DirectoryTree {
 public:
-	int MaxDepth;
-	int NodeCount;
+	int MaxDepth = 0;
+	int MaxRealDepth = 0;
+	int DirCount;
+	int FileCount;
+	TCHAR LongestFullPath[MAX_PATHLEN];
 	Node* Root;
-	Node* now;
 	DirectoryTree(TCHAR* RootName);
-	int AddSibling(Node* target);
-	int AddChild(Node* target);
+private:
+	int AddSibling(Node* base,Node* target);
+	int AddChild(Node* base,Node* target);
 };
