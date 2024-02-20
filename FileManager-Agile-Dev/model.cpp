@@ -77,11 +77,12 @@ int SqlScript::AppendScript(TCHAR* buf) {
 
 #pragma region Node
 
-Node::Node(TCHAR* PathName, DWORD FileAttribute, FILETIME CreatedTime, int Depth, int NodeId) {
+Node::Node(WIN32_FIND_DATA* Data, int Depth, int NodeId, TCHAR* PathName) {
+	this->FileAttribute = Data->dwFileAttributes;
+	this->CreatedTime = Data->ftCreationTime;
+	this->FileSize = (Data->nFileSizeHigh * (MAXDWORD + 1)) + Data->nFileSizeLow;
 	_tcscpy_s(this->PathName, MAX_PATHLEN, PathName);
 	this->NodeId = NodeId;
-	this->FileAttribute = FileAttribute;
-	this->CreatedTime = CreatedTime;
 	this->Depth = Depth;
 	this->Child = NULL;
 	this->Sibling = NULL;
@@ -101,7 +102,7 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 	TCHAR subDirPath[MAX_PATHLEN];//用来保存全路径
 	HANDLE hFind = FindFirstFile(RootPath, &data);
 	std::queue<Node*> dirQueue;
-	this->Root = new Node(RootPath, data.dwFileAttributes, data.ftCreationTime, 0, this->IdAccumulator++);
+	this->Root = new Node(&data,0, this->IdAccumulator++, RootPath);
 	dirQueue.push(Root);
 	int curDep = 0;
 	Node* curNode = Root;//根文件或要扫描的目录节点
@@ -120,7 +121,7 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 				}
 				//新建节点
 				wsprintf(subDirPath, L"%ls\\%ls", curNode->PathName, data.cFileName);
-				appNode = new Node(subDirPath, data.dwFileAttributes, data.ftCreationTime, curDep + 1, this->IdAccumulator++);
+				appNode = new Node(&data, curDep + 1, this->IdAccumulator++, subDirPath);
 				//深度统计
 				this->MaxDepth = (appNode->Depth > this->MaxDepth) ? appNode->Depth : this->MaxDepth;
 				//检查最长路径
@@ -160,15 +161,42 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 }
 
 /// <summary>
-/// 获取相应的路径下的文件信息，成功返回0
+/// 
 /// </summary>
-/// <param name="DirPath"></param>
+/// <param name="p">[in]</param>
+/// <param name="FileOldest">[out]</param>
+/// <param name="FileNewest">[out]</param>
+/// <param name="FileAmount">[out]</param>
+/// <param name="TotalFileSize">[out]</param>
 /// <returns></returns>
-int DirectoryTree::GetDirectoryInfo(Node* p) {
+int DirectoryTree::GetDirectoryInfo(Node* p,Node* FileOldest,Node* FileNewest,int* FileAmount,int* TotalFileSize) {
 	if (p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
+		//是目录
+		Node* now = p->Child;
+		Node* Newest = NULL;
+		Node* Oldest = NULL;
+		int FileCount = 0;
+		while (now) {
+			if (now->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
+				//是目录的话就跳过
+				continue;
+			}
+			//找到最早和最晚的文件节点
+			if (!Oldest || !Newest) {
+				//如果目录下存在文件，则用其初始化Newest和Oldest
+				Oldest = now;
+				Newest = now;
+			}
+			Oldest = (CompareFileTime(&(Oldest->CreatedTime),&(now->CreatedTime))<0) ? Oldest:now;
+			Newest = (CompareFileTime(&(Newest->CreatedTime), &(now->CreatedTime))>0) ? Newest : now;
+			//统计文件数量和文件总大小
+
+			now = now->Sibling;
+		}
 		return 0;
 	}
 	else {
+		//不是目录
 		return -1;
 	}
 }

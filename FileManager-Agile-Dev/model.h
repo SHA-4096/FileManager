@@ -17,13 +17,14 @@
 
 class Node {
 public:
-	Node(TCHAR*, DWORD, FILETIME, int Depth,int NodeId);
+	Node(WIN32_FIND_DATA* Data,int Depth,int NodeId,TCHAR* PathName);
 	TCHAR PathName[MAX_PATHLEN];
 	DWORD FileAttribute;
 	FILETIME CreatedTime;
 	int Depth;//文件树深度
 	int RealDep;//数据结构真实深度
 	int NodeId;
+	INT64 FileSize;
 	Node* Child;
 	Node* Sibling;
 	Node* Parent;
@@ -53,13 +54,13 @@ class DirectoryTree {
 public:
 	int MaxDepth = 0;
 	int MaxRealDepth = 0;
-	int DirCount;
-	int FileCount;
+	int DirCount = 0;
+	int FileCount = 0;
 	int IdAccumulator = 0;//分配NodeId
 	TCHAR LongestFullPath[MAX_PATHLEN];
 	Node* Root;
 	DirectoryTree(TCHAR* RootPath);
-	int GetDirectoryInfo(Node* p);
+	int GetDirectoryInfo(Node* p, Node* FileOldest, Node* FileNewest, int* FileAmount, int* TotalFileSize);
 	Node* GetNodeByPath(TCHAR* NodePath);
 private:
 	int AddSibling(Node* base,Node* target);
