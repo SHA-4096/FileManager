@@ -58,8 +58,9 @@ public:
 	int IdAccumulator = 0;//∑÷≈‰NodeId
 	TCHAR LongestFullPath[MAX_PATHLEN];
 	Node* Root;
-	DirectoryTree(TCHAR* RootName);
-
+	DirectoryTree(TCHAR* RootPath);
+	int GetDirectoryInfo(Node* p);
+	Node* GetNodeByPath(TCHAR* NodePath);
 private:
 	int AddSibling(Node* base,Node* target);
 	int AddChild(Node* base,Node* target);

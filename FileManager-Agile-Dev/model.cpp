@@ -159,6 +159,58 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 
 }
 
+/// <summary>
+/// 获取相应的路径下的文件信息，成功返回0
+/// </summary>
+/// <param name="DirPath"></param>
+/// <returns></returns>
+int DirectoryTree::GetDirectoryInfo(Node* p) {
+	if (p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
+		return 0;
+	}
+	else {
+		return -1;
+	}
+}
+
+/// <summary>
+/// 通过path获取指定的节点，失败返回NULL
+/// </summary>
+/// <param name="NodePath"></param>
+/// <returns></returns>
+Node* DirectoryTree::GetNodeByPath(TCHAR* NodePath) {
+	Node* ret = NULL;
+	Node* now = this->Root;
+
+	while (now) {
+		while (wcsstr(NodePath, now->PathName)) {
+			//向下搜索
+			Node* p = now->Child;
+			bool nowUpdateFlag = false;
+			while(p){
+				//检查now对应目录下一层目录
+				if(wcsstr(NodePath, p->PathName)) {
+					now = p;
+					nowUpdateFlag = true;
+					break;
+				}
+				p = p->Sibling;
+			}
+			if (!nowUpdateFlag) {
+				//now没有被更新，说明可能是now就是要找的节点，或文件树中没有对应目录
+				break;
+			}
+		}
+		if (!_tcscmp(NodePath, now->PathName)) {
+			//检索成功
+			ret = now;
+			break;
+		}
+		//检索失败，搜索now同级的其它目录
+		now = now->Sibling;
+	}
+	return ret;
+}
 
 /// <summary>
 /// 添加Sibling, 成功返回0
