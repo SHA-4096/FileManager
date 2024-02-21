@@ -12,8 +12,20 @@
 #define SIBLING_ID(x) x->Sibling ? x->Sibling->NodeId:0
 #define SELF_ID(x) x ? x->NodeId:0
 
+#define Unit_KB 0
+#define Unit_MB 1
+#define Unit_GB 2
+#define Unit_TB 3
 
+/*
+const TCHAR* UnitStr[] = { _T("KB"),_T("MB"),_T("GB"),_T("TB") };
+const INT64 UnitSize[] = { 1024,1024*1024,1024*1024*1024,1024*1024*1024*1024 };
 
+struct FileSizeStruct {
+	INT64 Size;
+	short Unit;
+};
+*/
 
 class Node {
 public:
@@ -60,7 +72,7 @@ public:
 	TCHAR LongestFullPath[MAX_PATHLEN];
 	Node* Root;
 	DirectoryTree(TCHAR* RootPath);
-	int GetDirectoryInfo(Node* p, Node* FileOldest, Node* FileNewest, int* FileAmount, int* TotalFileSize);
+	int GetDirectoryInfo(Node* p, Node* FileOldest, Node* FileNewest, int* FileAmount, INT64* TotalFileSize);
 	Node* GetNodeByPath(TCHAR* NodePath);
 private:
 	int AddSibling(Node* base,Node* target);

@@ -81,6 +81,7 @@ Node::Node(WIN32_FIND_DATA* Data, int Depth, int NodeId, TCHAR* PathName) {
 	this->FileAttribute = Data->dwFileAttributes;
 	this->CreatedTime = Data->ftCreationTime;
 	this->FileSize = (Data->nFileSizeHigh * (MAXDWORD + 1)) + Data->nFileSizeLow;
+	//this->FileSize /= (1024 * 1024);//以MB计
 	_tcscpy_s(this->PathName, MAX_PATHLEN, PathName);
 	this->NodeId = NodeId;
 	this->Depth = Depth;
@@ -169,30 +170,37 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 /// <param name="FileAmount">[out]</param>
 /// <param name="TotalFileSize">[out]</param>
 /// <returns></returns>
-int DirectoryTree::GetDirectoryInfo(Node* p,Node* FileOldest,Node* FileNewest,int* FileAmount,int* TotalFileSize) {
+int DirectoryTree::GetDirectoryInfo(Node* p,Node* FileOldest,Node* FileNewest,int* FileAmount,INT64* TotalFileSize) {
 	if (p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
 		//是目录
 		Node* now = p->Child;
-		Node* Newest = NULL;
-		Node* Oldest = NULL;
-		int FileCount = 0;
+		Node* newest = NULL;
+		Node* oldest = NULL;
+		int fileCount = 0;
+		INT64 totalFileSize = 0;
 		while (now) {
 			if (now->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
 				//是目录的话就跳过
 				continue;
 			}
 			//找到最早和最晚的文件节点
-			if (!Oldest || !Newest) {
+			if (!oldest || !newest) {
 				//如果目录下存在文件，则用其初始化Newest和Oldest
-				Oldest = now;
-				Newest = now;
+				oldest = now;
+				newest = now;
 			}
-			Oldest = (CompareFileTime(&(Oldest->CreatedTime),&(now->CreatedTime))<0) ? Oldest:now;
-			Newest = (CompareFileTime(&(Newest->CreatedTime), &(now->CreatedTime))>0) ? Newest : now;
+			oldest = (CompareFileTime(&(oldest->CreatedTime),&(now->CreatedTime))<0) ? oldest:now;
+			newest = (CompareFileTime(&(newest->CreatedTime), &(now->CreatedTime))>0) ? newest : now;
 			//统计文件数量和文件总大小
-
+			fileCount++;
+			totalFileSize += now->FileSize;
 			now = now->Sibling;
 		}
+		//返回结果
+		*FileAmount = fileCount;
+		FileNewest = newest;
+		FileOldest = oldest;
+		*TotalFileSize = totalFileSize;
 		return 0;
 	}
 	else {
