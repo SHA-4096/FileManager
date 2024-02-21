@@ -79,7 +79,7 @@ int SqlScript::AppendScript(TCHAR* buf) {
 
 Node::Node(WIN32_FIND_DATA* Data, int Depth, int NodeId, TCHAR* PathName) {
 	this->FileAttribute = Data->dwFileAttributes;
-	this->CreatedTime = Data->ftCreationTime;
+	this->CreatedTime = Data->ftLastWriteTime;
 	this->FileSize = (Data->nFileSizeHigh * (MAXDWORD + 1)) + Data->nFileSizeLow;
 	//this->FileSize /= (1024 * 1024);//以MB计
 	_tcscpy_s(this->PathName, MAX_PATHLEN, PathName);
@@ -170,7 +170,7 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 /// <param name="FileAmount">[out]</param>
 /// <param name="TotalFileSize">[out]</param>
 /// <returns></returns>
-int DirectoryTree::GetDirectoryInfo(Node* p,Node* FileOldest,Node* FileNewest,int* FileAmount,INT64* TotalFileSize) {
+int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,int* FileAmount,INT64* TotalFileSize) {
 	if (p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
 		//是目录
 		Node* now = p->Child;
@@ -198,8 +198,8 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node* FileOldest,Node* FileNewest,in
 		}
 		//返回结果
 		*FileAmount = fileCount;
-		FileNewest = newest;
-		FileOldest = oldest;
+		*FileNewest = newest;
+		*FileOldest = oldest;
 		*TotalFileSize = totalFileSize;
 		return 0;
 	}

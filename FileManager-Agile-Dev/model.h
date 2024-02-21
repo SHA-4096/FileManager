@@ -72,7 +72,7 @@ public:
 	TCHAR LongestFullPath[MAX_PATHLEN];
 	Node* Root;
 	DirectoryTree(TCHAR* RootPath);
-	int GetDirectoryInfo(Node* p, Node* FileOldest, Node* FileNewest, int* FileAmount, INT64* TotalFileSize);
+	int GetDirectoryInfo(Node* p, Node** FileOldest, Node** FileNewest, int* FileAmount, INT64* TotalFileSize);
 	Node* GetNodeByPath(TCHAR* NodePath);
 private:
 	int AddSibling(Node* base,Node* target);
