@@ -17,6 +17,7 @@
 #define Unit_GB 2
 #define Unit_TB 3
 
+
 /*
 const TCHAR* UnitStr[] = { _T("KB"),_T("MB"),_T("GB"),_T("TB") };
 const INT64 UnitSize[] = { 1024,1024*1024,1024*1024*1024,1024*1024*1024*1024 };
@@ -32,14 +33,15 @@ public:
 	Node(WIN32_FIND_DATA* Data,int Depth,int NodeId,TCHAR* PathName);
 	TCHAR PathName[MAX_PATHLEN];
 	DWORD FileAttribute;
-	FILETIME CreatedTime;
+	INT64 ModifiedTime;
 	int Depth;//文件树深度
 	int RealDep;//数据结构真实深度
 	int NodeId;
 	INT64 FileSize;
 	Node* Child;
 	Node* Sibling;
-	Node* Parent;
+	Node* Parent;//上层目录节点
+	Node* RealParent;//数据结构中的父节点
 };
 
 /// <summary>
@@ -54,7 +56,7 @@ public:
 	~SqlScript();
 	size_t CalcHash(TCHAR* path);//用path在内存中的地址作为参数计算hash值
 	int InitScript(/*char* exePath, char* uName, char* pwd, char* host, char* port*/);//初始化脚本文件
-	int AddNode(TCHAR* path, DWORD attr, FILETIME time, int child, int sibling, int parent);//在文件中追加一行)
+	int AddNode(TCHAR* path, DWORD attr, INT64 time, int child, int sibling, int parent);//在文件中追加一行)
 	int UpdateRelation(Node* p);//更新关系
 private:
 	FILE* fp;
@@ -73,10 +75,12 @@ public:
 	Node* Root;
 	DirectoryTree(TCHAR* RootPath);
 	int GetDirectoryInfo(Node* p, Node** FileOldest, Node** FileNewest, int* FileAmount, INT64* TotalFileSize);
+	int AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size);
 	Node* GetNodeByPath(TCHAR* NodePath);
 private:
 	int AddSibling(Node* base,Node* target);
 	int AddChild(Node* base,Node* target);
+	int DeleteFileNode(Node* p);
 	SqlScript* Script;
 };
 
