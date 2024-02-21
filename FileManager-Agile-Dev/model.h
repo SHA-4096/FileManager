@@ -54,7 +54,6 @@ class SqlScript {
 public:
 	SqlScript();
 	~SqlScript();
-	size_t CalcHash(TCHAR* path);//用path在内存中的地址作为参数计算hash值
 	int InitScript(/*char* exePath, char* uName, char* pwd, char* host, char* port*/);//初始化脚本文件
 	int AddNode(TCHAR* path, DWORD attr, INT64 time, int child, int sibling, int parent);//在文件中追加一行)
 	int UpdateRelation(Node* p);//更新关系

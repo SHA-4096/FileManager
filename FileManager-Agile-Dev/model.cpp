@@ -219,11 +219,12 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,
 /// <returns></returns>
 int DirectoryTree::AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size)
 {
-	TCHAR Modes[] = { _T('A'),_T('M'),_T('D') };//[A]dd,[D]elete,[M]odify
-	if (_tcscmp(Mode, &Modes[0])) {
+	TCHAR* Modes[3] = { L"A",L"M",L"D"};//[A]dd,[D]elete,[M]odify
+	if (!_tcscmp(Mode, Modes[0])) {
 		//新增文件节点
+		return 0;
 
-	}else if (_tcscmp(Mode, &Modes[1])) {
+	}else if (!_tcscmp(Mode, Modes[1])) {
 		//先检查文件节点是否存在
 		Node* target = this->GetNodeByPath(Path);
 		if (!target) {
@@ -235,14 +236,15 @@ int DirectoryTree::AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTim
 		target->ModifiedTime = LastModifiedTime;
 		return 0;
 	}
-	else if (_tcscmp(Mode, &Modes[2])){
+	else if (!_tcscmp(Mode, Modes[2])){
 		//删除文件节点
 		Node* target = this->GetNodeByPath(Path);
 		if (!target) {
 			//文件节点不存在
 			return -1;
 		}
-
+		this->DeleteFileNode(target);
+		return 0;
 	}
 	else {
 		return -1;
@@ -353,8 +355,15 @@ int DirectoryTree::DeleteFileNode(Node* p)
 			delete p;
 		}
 		else {
-			p->RealParent->Child = p->Sibling;
-			p->Sibling->RealParent = p->RealParent;
+			if (p->Parent == p->RealParent) {
+				//RealParent是上层目录
+				p->RealParent->Child = p->Sibling;
+				p->Sibling->RealParent = p->RealParent;
+			}
+			else {
+				p->RealParent->Sibling = p->Sibling;
+				p->Sibling->RealParent = p->RealParent;
+			}
 			delete p;
 		}
 	}
