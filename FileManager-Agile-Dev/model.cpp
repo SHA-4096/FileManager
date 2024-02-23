@@ -88,6 +88,18 @@ Node::Node(WIN32_FIND_DATA* Data, int Depth, int NodeId, TCHAR* PathName) {
 	this->Child = NULL;
 	this->Sibling = NULL;
 }
+
+Node::Node(INT64 Size, INT64 ModifiedTime, DWORD FileAttribute,int Depth, int NodeId, TCHAR* PathName)
+{
+	this->FileAttribute = FileAttribute;
+	this->ModifiedTime = ModifiedTime;
+	this->FileSize = Size;
+	_tcscpy_s(this->PathName, MAX_PATHLEN, PathName);
+	this->NodeId = NodeId;
+	this->Depth = Depth;
+	this->Child = NULL;
+	this->Sibling = NULL;
+}
 #pragma endregion
 
 #pragma region DirectoryTree
@@ -222,6 +234,34 @@ int DirectoryTree::AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTim
 	TCHAR* Modes[3] = { L"A",L"M",L"D"};//[A]dd,[D]elete,[M]odify
 	if (!_tcscmp(Mode, Modes[0])) {
 		//新增文件节点
+		//首先将文件名部分Trim掉
+		TCHAR folderPath[MAX_PATHLEN];
+		_tcscpy_s(folderPath, Path);
+		int tail = _tcslen(folderPath) - 1;
+		while (folderPath[tail] != L'\\') {
+			folderPath[tail] = L'\0';
+			tail--;
+		}
+		folderPath[tail] = L'\0';
+		//检查文件夹是否存在
+		Node* target = this->GetNodeByPath(folderPath);
+		if (!target) {
+			return -1;
+		}
+		//检查文件节点是否存在
+		Node* fileTarget = this->GetNodeByPath(Path);
+		if (fileTarget) {
+			return -1;
+		}
+		//新增文件节点
+		Node* newNode = new Node(Size, LastModifiedTime, (DWORD(FILE_ATTRIBUTE_NORMAL)), target->Depth + 1, this->IdAccumulator++, Path);
+		if (target->Child) {
+			target = target->Child;
+			AddSibling(target, newNode);
+		}
+		else {
+			AddChild(target, newNode);
+		}
 		return 0;
 
 	}else if (!_tcscmp(Mode, Modes[1])) {

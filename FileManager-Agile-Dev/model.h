@@ -31,6 +31,7 @@ struct FileSizeStruct {
 class Node {
 public:
 	Node(WIN32_FIND_DATA* Data,int Depth,int NodeId,TCHAR* PathName);
+	Node(INT64 Size, INT64 ModifiedTime,DWORD FileAttribute,int Depth, int NodeId, TCHAR* PathName);
 	TCHAR PathName[MAX_PATHLEN];
 	DWORD FileAttribute;
 	INT64 ModifiedTime;
