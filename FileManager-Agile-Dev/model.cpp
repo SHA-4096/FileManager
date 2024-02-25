@@ -2,10 +2,31 @@
 
 #pragma region SqlScript
 
-
-SqlScript::SqlScript() {
+/// <summary>
+/// 初始化数据库表创建语句，如果有同名表的话则先将其删除
+/// </summary>
+/// <param name="TableName"></param>
+SqlScript::SqlScript(TCHAR* TableName) {
 	fp = nullptr;
 	fopen_s(&fp, "script.sql", "wb");
+	TCHAR buf[MAX_PATHLEN*10];
+	swprintf_s(buf, MAX_PATHLEN * 10,_T("SET sql_mode = NO_BACKSLASH_ESCAPES;\n"));//取消转义
+	swprintf_s(buf, MAX_PATHLEN*10,_T("%lsDROP TABLE IF EXISTS `%ls`;\n"), buf,TableName);
+	swprintf_s(buf, MAX_PATHLEN * 10, _T("%ls"
+		"CREATE TABLE %ls ("
+		"node_id INT,"
+		"full_path TEXT,"
+		"child INT,"
+		"sibling INT,"
+		"parent INT,"
+		"file_attr INT,"
+		"modified_time BIGINT,"
+		"size BIGINT"
+		");"),
+		buf,TableName
+	);
+	this->AppendScript(buf);
+	_tcscpy_s(this->TableName, TableName);
 }
 
 SqlScript::~SqlScript() {
@@ -35,15 +56,15 @@ int SqlScript::InitScript(/*char* exePath, char* uName, char* pwd, char* host, c
 /// <param name="sibling"></param>
 /// <param name="parent"></param>
 /// <returns></returns>
-int SqlScript::AddNode(TCHAR* path, DWORD attr, INT64 time, int child, int sibling, int parent)
+int SqlScript::AddNode(int NodeId,TCHAR* Path, DWORD Attr, INT64 Time, INT64 Size,int Child, int Sibling, int Parent)
 {
 	auto SysTime = new SYSTEMTIME();
 	//FileTimeToSystemTime(&time, SysTime);
 	TCHAR buf[MAX_PATHLEN*2];
 	//auto formattedTime = new TCHAR[20];
 	//_stprintf_s(formattedTime, 20, _T("%d-%d-%d"), SysTime->wYear, SysTime->wMonth, SysTime->wDay);
-	_stprintf_s(buf, MAX_PATHLEN*2, _T("INSERT INTO `file` (`path`, `attr`, `time`, `child`, `sibling`, `parent`) VALUES ('%ls', %d, %lld, %d, %d, %d);\n"), 
-		path, attr, time, child, sibling, parent);
+	_stprintf_s(buf, MAX_PATHLEN*2, _T("INSERT INTO `%ls` (`node_id`,`full_path`, `file_attr`, `modified_time`, `child`, `sibling`, `parent` ,`size` ) VALUES (%d ,'%ls', %d, %lld, %d, %d, %d, %lld);\n"), 
+		this->TableName,NodeId,Path, Attr, Time, Child, Sibling, Parent,Size);
 	this->AppendScript(buf);
 	return 0;
 }
@@ -58,8 +79,8 @@ int SqlScript::AddNode(TCHAR* path, DWORD attr, INT64 time, int child, int sibli
 /// <returns></returns>
 int SqlScript::UpdateRelation(Node* p) {
 	TCHAR buf[MAX_PATHLEN * 2];
-	_stprintf_s(buf, MAX_PATHLEN * 2, _T("UPDATE `file` SET `child` = %d, `sibling` = %d, `parent` = %d WHERE `node_id` = %d;\n"),
-		CHILD_ID(p), SIBLING_ID(p), PARENT_ID(p), SELF_ID(p));
+	_stprintf_s(buf, MAX_PATHLEN * 2, _T("UPDATE `%ls` SET `child` = %d, `sibling` = %d, `parent` = %d WHERE `node_id` = %d;\n"),
+		this->TableName,CHILD_ID(p), SIBLING_ID(p), PARENT_ID(p), SELF_ID(p));
 	AppendScript(buf);
 	return 0;
 }
@@ -108,7 +129,7 @@ Node::Node(INT64 Size, INT64 ModifiedTime, DWORD FileAttribute,int Depth, int No
 /// </summary>
 /// <param name="RootName"></param>
 DirectoryTree::DirectoryTree(TCHAR* RootPath) {
-	this->Script = new SqlScript();
+	this->Script = new SqlScript(_T("test"));
 	setlocale(LC_ALL, "");
 	WIN32_FIND_DATA data;
 	TCHAR currentPath[MAX_PATHLEN];//用来做当前目录的搜索
@@ -116,6 +137,7 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 	HANDLE hFind = FindFirstFile(RootPath, &data);
 	std::queue<Node*> dirQueue;
 	this->Root = new Node(&data,0, this->IdAccumulator++, RootPath);
+	this->Script->AddNode(this->Root->NodeId,this->Root->PathName, this->Root->FileAttribute, this->Root->ModifiedTime, this->Root->FileSize, 0, 0, 0);
 	dirQueue.push(Root);
 	int curDep = 0;
 	Node* curNode = Root;//根文件或要扫描的目录节点
@@ -128,7 +150,7 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 		hFind = FindFirstFile(currentPath, &data);
 		if (hFind != INVALID_HANDLE_VALUE) {
 			do {
-				if (!(_tcscmp(data.cFileName, L".") && _tcscmp(data.cFileName, L".."))) {
+				if (!(lowerCaseCmp(data.cFileName, L".") && lowerCaseCmp(data.cFileName, L".."))) {
 					//跳过.和..
 					continue;
 				}
@@ -193,6 +215,7 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,
 		while (now) {
 			if (now->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
 				//是目录的话就跳过
+				now = now->Sibling;
 				continue;
 			}
 			//找到最早和最晚的文件节点
@@ -229,10 +252,10 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,
 /// <param name="LastModifiedTime"></param>
 /// <param name="Size"></param>
 /// <returns></returns>
-int DirectoryTree::AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size)
+int DirectoryTree::AlterNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size)
 {
 	TCHAR* Modes[3] = { L"A",L"M",L"D"};//[A]dd,[D]elete,[M]odify
-	if (!_tcscmp(Mode, Modes[0])) {
+	if (!lowerCaseCmp(Mode, Modes[0])) {
 		//新增文件节点
 		//首先将文件名部分Trim掉
 		TCHAR folderPath[MAX_PATHLEN];
@@ -264,26 +287,27 @@ int DirectoryTree::AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTim
 		}
 		return 0;
 
-	}else if (!_tcscmp(Mode, Modes[1])) {
+	}else if (!lowerCaseCmp(Mode, Modes[1])) {
+		//修改文件节点
 		//先检查文件节点是否存在
 		Node* target = this->GetNodeByPath(Path);
 		if (!target) {
 			//文件节点不存在
 			return -1;
 		}
-		//修改文件节点
+		//修改
 		target->FileSize = Size;
 		target->ModifiedTime = LastModifiedTime;
 		return 0;
 	}
-	else if (!_tcscmp(Mode, Modes[2])){
-		//删除文件节点
+	else if (!lowerCaseCmp(Mode, Modes[2])){
+		//删除文件或文件夹节点
 		Node* target = this->GetNodeByPath(Path);
 		if (!target) {
-			//文件节点不存在
+			//节点不存在
 			return -1;
 		}
-		this->DeleteFileNode(target);
+		this->DeleteNode(target);
 		return 0;
 	}
 	else {
@@ -301,13 +325,13 @@ Node* DirectoryTree::GetNodeByPath(TCHAR* NodePath) {
 	Node* now = this->Root;
 
 	while (now) {
-		while (wcsstr(NodePath, now->PathName)) {
+		while (lowerCaseContain(NodePath, now->PathName)) {
 			//向下搜索
 			Node* p = now->Child;
 			bool nowUpdateFlag = false;
 			while(p){
 				//检查now对应目录下一层目录
-				if(wcsstr(NodePath, p->PathName)) {
+				if(lowerCaseContain(NodePath, p->PathName)) {
 					now = p;
 					nowUpdateFlag = true;
 					break;
@@ -319,7 +343,7 @@ Node* DirectoryTree::GetNodeByPath(TCHAR* NodePath) {
 				break;
 			}
 		}
-		if (!_tcscmp(NodePath, now->PathName)) {
+		if (!lowerCaseCmp(NodePath, now->PathName)) {
 			//检索成功
 			ret = now;
 			break;
@@ -347,7 +371,7 @@ int DirectoryTree::AddSibling(Node* base, Node* target) {
 	//更新最大深度
 	this->MaxRealDepth = max(target->RealDep, MaxRealDepth);
 	//Sql相关操作
-	this->Script->AddNode(target->PathName, target->FileAttribute, target->ModifiedTime, 0, 0, target->Parent->NodeId);
+	this->Script->AddNode(target->NodeId,target->PathName, target->FileAttribute,target->ModifiedTime,target->FileSize, 0, 0, target->Parent->NodeId);
 	this->Script->UpdateRelation(p);
 	return 0;
 }
@@ -370,7 +394,7 @@ int DirectoryTree::AddChild(Node* base, Node* target) {
 	//更新最大深度
 	this->MaxRealDepth = max(target->RealDep, MaxRealDepth);
 	//Sql相关操作
-	this->Script->AddNode(target->PathName, target->FileAttribute, target->ModifiedTime, 0, 0, target->Parent->NodeId);
+	this->Script->AddNode(target->NodeId,target->PathName, target->FileAttribute, target->ModifiedTime,target->FileSize, 0, 0, target->Parent->NodeId);
 	this->Script->UpdateRelation(p);
 	return 0;
 }
@@ -379,32 +403,47 @@ int DirectoryTree::AddChild(Node* base, Node* target) {
 /// </summary>
 /// <param name="p"></param>
 /// <returns></returns>
-int DirectoryTree::DeleteFileNode(Node* p)
+int DirectoryTree::DeleteNode(Node* p)
 {
-	if(p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY){
-		//是目录
+	if (!p) {
 		return -1;
 	}
+	Node* isoTreeRoot = p->Child;//删除节点后可能会有一棵被独立出来的树
+	if (!(p->RealParent)) {
+		//根节点，直接删了
+		delete p;
+	}
 	else {
-		//是文件
-		//删除文件节点
-		//注意文件节点必定没有Child节点，只需要维护Sibling节点就好了
-		//并且由Parent的意义知Parent不变
-		if (!(p->RealParent)) {
-			//根节点，直接删了
-			delete p;
+		if (p->Parent == p->RealParent) {
+			//RealParent是上层目录
+			p->RealParent->Child = p->Sibling;
+			if(p->Sibling) p->Sibling->RealParent = p->RealParent;
 		}
 		else {
-			if (p->Parent == p->RealParent) {
-				//RealParent是上层目录
-				p->RealParent->Child = p->Sibling;
-				p->Sibling->RealParent = p->RealParent;
-			}
-			else {
-				p->RealParent->Sibling = p->Sibling;
-				p->Sibling->RealParent = p->RealParent;
-			}
-			delete p;
+			p->RealParent->Sibling = p->Sibling;
+			if(p->Sibling) p->Sibling->RealParent = p->RealParent;
+		}
+		//统计数量
+		p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY ?
+			this->DirCount-- : this->FileCount--;
+		//释放内存
+		delete p;
+	}
+	if (isoTreeRoot) {
+		//删除独立出来的无效的节点组成的树,isoTreeRoot为根
+		std::queue<Node*> nodesToDelete;
+		nodesToDelete.push(isoTreeRoot);
+		while (nodesToDelete.size()) {
+			//层次遍历并删除节点
+			Node* curNode = nodesToDelete.front();
+			nodesToDelete.pop();
+			if (curNode->Child)  nodesToDelete.push(curNode->Child); 
+			if (curNode->Sibling) nodesToDelete.push(curNode->Sibling);
+			//统计数量
+			curNode->FileAttribute& FILE_ATTRIBUTE_DIRECTORY ?
+				this->DirCount-- : this->FileCount--;
+			//释放内存
+			delete curNode;
 		}
 	}
 	return 0;

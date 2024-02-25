@@ -4,7 +4,8 @@
 #include<stdio.h>
 #include<tchar.h>
 #include<windows.h>
-#include<uuids.h>
+#include"util.h"
+
 #define MAX_PATHLEN 1000
 
 #define CHILD_ID(x) x->Child ? x->Child->NodeId:0
@@ -47,21 +48,22 @@ public:
 
 /// <summary>
 /// 表项如下(默认主键等省略)
-/// +--------+--------+-------+-------+-------+--------+----------+
-/// |NodeId	 |FullPath|Child  |Sibling|Parent |FileAttr|CreateTime|
-/// +--------+--------+-------+-------+-------+--------+----------+
+/// +--------+---------+-------+-------+-------+---------+-------------+------+
+/// |node_id |full_path|child  |sibling|parent |file_attr|modified_time|size  |
+/// +--------+---------+-------+-------+-------+---------+-------------+------+
 /// </summary>
 class SqlScript {
 public:
-	SqlScript();
+	SqlScript(TCHAR* TableName);
 	~SqlScript();
 	int InitScript(/*char* exePath, char* uName, char* pwd, char* host, char* port*/);//初始化脚本文件
-	int AddNode(TCHAR* path, DWORD attr, INT64 time, int child, int sibling, int parent);//在文件中追加一行)
+	int AddNode(int NodeId,TCHAR* Path, DWORD Attr, INT64 Time, INT64 Size, int Child, int Sibling, int Parent);//在文件中追加一行)
 	int UpdateRelation(Node* p);//更新关系
 private:
 	FILE* fp;
 	std::hash<TCHAR*> hash;
 	int AppendScript(TCHAR* buf);//在文件中追加脚本
+	TCHAR TableName[MAX_PATHLEN];
 };
 
 class DirectoryTree {
@@ -75,12 +77,12 @@ public:
 	Node* Root;
 	DirectoryTree(TCHAR* RootPath);
 	int GetDirectoryInfo(Node* p, Node** FileOldest, Node** FileNewest, int* FileAmount, INT64* TotalFileSize);
-	int AlterFileNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size);
+	int AlterNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size);
 	Node* GetNodeByPath(TCHAR* NodePath);
 private:
 	int AddSibling(Node* base,Node* target);
 	int AddChild(Node* base,Node* target);
-	int DeleteFileNode(Node* p);
+	int DeleteNode(Node* p);
 	SqlScript* Script;
 };
 
