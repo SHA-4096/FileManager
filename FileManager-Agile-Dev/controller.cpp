@@ -1,12 +1,16 @@
 #include"controller.h"
 
-CommandReader::CommandReader(TCHAR* FileName) {
-	this->DirTree = new DirectoryTree(_T("C:\\Windows"));
-	_tfopen_s(&ReadFp,FileName, _T("r"));
-	_tfopen_s(&WriteFp, L"result.txt", L"w,ccs=UNICODE");
+int ControllerClass::SetCommandScript(TCHAR* FileName) {
+	return _tfopen_s(&ReadFp, FileName, _T("r"));
+	
 }
 
-int CommandReader::ExecuteCommand() {
+int ControllerClass::ScanDir(TCHAR* Path) {
+	this->DirTree = new DirectoryTree(Path);
+	return 0;
+}
+
+int ControllerClass::ExecuteCommand() {
 	int mode = 0;
 	fgetws(ReadBuf, MAX_PATHLEN * 3, ReadFp);
 	this->CommandTrim();
@@ -69,7 +73,7 @@ int CommandReader::ExecuteCommand() {
 /// 以逗号Trim参数，返回Trim后的参数数量
 /// </summary>
 /// <returns></returns>
-int CommandReader::CommandTrim() {
+int ControllerClass::CommandTrim() {
 	TCHAR* head = ReadBuf;
 	TCHAR* tail = head;
 	int argIndex = 0;
@@ -92,7 +96,7 @@ int CommandReader::CommandTrim() {
 /// </summary>
 /// <param name="Path"></param>
 /// <returns></returns>
-int CommandReader::GetFolderStat(TCHAR* Path) {
+int ControllerClass::GetFolderStat(TCHAR* Path) {
 	Node *oldest = NULL, *newest = NULL;
 	INT64 filesize=0;
 	int count = 0;
@@ -121,8 +125,11 @@ int CommandReader::GetFolderStat(TCHAR* Path) {
 /// 将this->WriteBuf的内容写到WriteFp中，成功返回0
 /// </summary>
 /// <returns></returns>
-int CommandReader::WriteResult()
+int ControllerClass::WriteResult()
 {
+	_tfopen_s(&WriteFp, L"result.txt", L"a,ccs=UNICODE");
 	setlocale(LC_ALL, "");
-	return EOF == fwrite(this->WriteBuf, sizeof(TCHAR), _tcslen(this->WriteBuf), this->WriteFp);
+	auto res = (EOF == fwrite(this->WriteBuf, sizeof(TCHAR), _tcslen(this->WriteBuf), this->WriteFp));
+	fclose(WriteFp);
+	return res;
 }

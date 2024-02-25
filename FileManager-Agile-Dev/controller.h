@@ -7,10 +7,11 @@
 #define MODE_MYFILE 1
 #define MODE_MYSTAT 2
 #define MAX_ARG_COUNT 4
-class CommandReader{
+class ControllerClass{
 public:
 	DirectoryTree* DirTree;
-	CommandReader(TCHAR* FileName);
+	int SetCommandScript(TCHAR* Path);
+	int ScanDir(TCHAR* Path);
 	int ExecuteCommand();
 	TCHAR WriteBuf[MAX_PATHLEN * 5];//输出数据的buffer
 private:
