@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FileManagerGui": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
