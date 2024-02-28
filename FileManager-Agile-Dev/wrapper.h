@@ -8,6 +8,7 @@ public:
 	int OpenCommandFile(BYTE* FileAbsolutePath);
 	int ScanDir(BYTE* Path);
 	int ExecuteCommand();
+	int Debug();
 private:
 	ControllerClass* Reader;//Wrapper for ControllerClass
 };

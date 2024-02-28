@@ -3,11 +3,13 @@
 #include<queue>
 #include<stdio.h>
 #include<tchar.h>
+#include<map>
 #include<windows.h>
+#include<vector>
 #include"util.h"
 
 #define MAX_PATHLEN 1000
-
+#define MAX_NODE_COUNT 500000
 #define CHILD_ID(x) x->Child ? x->Child->NodeId:0
 #define PARENT_ID(x) x->Parent ? x->Parent->NodeId:0
 #define SIBLING_ID(x) x->Sibling ? x->Sibling->NodeId:0
@@ -73,16 +75,22 @@ public:
 	int DirCount = 0;
 	int FileCount = 0;
 	int IdAccumulator = 0;//分配NodeId
+	int VersionControl = 0;//用来记录转储的节点统计数据的版本
+	int TotalAlterExecuted = 0;//记录总共执行的Alter操作次数
 	TCHAR LongestFullPath[MAX_PATHLEN];
 	Node* Root;
+	std::vector<int> UpdatedNodes;
 	DirectoryTree(TCHAR* RootPath);
 	int GetDirectoryInfo(Node* p, Node** FileOldest, Node** FileNewest, int* FileAmount, INT64* TotalFileSize);
 	int AlterNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size);
 	Node* GetNodeByPath(TCHAR* NodePath);
+	Node* GetNodeById(int NodeId);
+	int DumpDirInfo(Node* p,TCHAR* txtFileName);
 private:
 	int AddSibling(Node* base,Node* target);
 	int AddChild(Node* base,Node* target);
 	int DeleteNode(Node* p);
+	std::map<int,Node*> NodeMap;
 	SqlScript* Script;
 };
 

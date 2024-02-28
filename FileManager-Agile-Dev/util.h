@@ -6,3 +6,5 @@
 int lowerCaseCmp(TCHAR* str1, TCHAR* str2);
 TCHAR* lowerCaseContain(TCHAR* str1, TCHAR* str2);
 int cmpDiff(TCHAR* PathOrigin, TCHAR* PathNew, TCHAR* Pathresult);
+int dumpFolderStat(TCHAR* txtFileName, TCHAR* buf);
+int cmpFolderDiff(TCHAR* PathOrigin, TCHAR* PathNew, TCHAR* Pathresult);

@@ -39,3 +39,8 @@ int FileManagerWrapper::ScanDir(BYTE* Path) {
 	_tcscpy_s(tPath, MAX_PATHLEN, (TCHAR*)Path);
 	return this->Reader->ScanDir(tPath);
 }
+
+int FileManagerWrapper::Debug() {
+	this->Reader->Debug();
+	return 0;
+}

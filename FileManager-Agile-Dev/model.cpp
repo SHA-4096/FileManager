@@ -156,7 +156,10 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 				}
 				//新建节点
 				wsprintf(subDirPath, L"%ls\\%ls", curNode->PathName, data.cFileName);
+				//新建节点
 				appNode = new Node(&data, curDep + 1, this->IdAccumulator++, subDirPath);
+				//记录NodeId和Node对象的映射关系
+				NodeMap[appNode->NodeId] = appNode;
 				//深度统计
 				this->MaxDepth = (appNode->Depth > this->MaxDepth) ? appNode->Depth : this->MaxDepth;
 				//检查最长路径
@@ -207,6 +210,19 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,int* FileAmount,INT64* TotalFileSize) {
 	if (p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY) {
 		//是目录
+		//之前没有记录过，则记录当前目录下的文件信息
+		FILE* tmp = NULL;
+		TCHAR* txtOldFileName = new TCHAR[MAX_PATHLEN];
+		int folderNodeId = p->NodeId;
+		//_stprintf_s(txtOldFileName, MAX_PATHLEN, _T("node%d_ver%d.txt"), folderNodeId, this->VersionControl);
+		//auto res = _tfopen_s(&tmp, txtOldFileName, L"r");
+		//if (res) {
+			//记录的文件不存在,创建一个记录
+			//this->DumpDirInfo(p, txtOldFileName);
+			//将更新的节点的NodeId记录下来以便后续扫描
+			//this->UpdatedNodes.push_back(folderNodeId);
+		//}
+
 		Node* now = p->Child;
 		Node* newest = NULL;
 		Node* oldest = NULL;
@@ -245,7 +261,7 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,
 }
 
 /// <summary>
-/// 对文件节点进行增删改操作，成功返回0
+/// 对文件节点进行增删改操作，成功返回0；同时会更新数据库的内容
 /// </summary>
 /// <param name="p"></param>
 /// <param name="Mode"></param>
@@ -254,6 +270,7 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,
 /// <returns></returns>
 int DirectoryTree::AlterNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, INT64 Size)
 {
+	this->TotalAlterExecuted ++;
 	TCHAR* Modes[3] = { L"A",L"M",L"D"};//[A]dd,[D]elete,[M]odify
 	if (!lowerCaseCmp(Mode, Modes[0])) {
 		//新增文件节点
@@ -276,6 +293,20 @@ int DirectoryTree::AlterNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, I
 		if (fileTarget) {
 			return -1;
 		}
+		/*
+		//之前没有记录过，则记录当前目录下的文件信息
+		FILE* tmp = NULL;
+		TCHAR* txtOldFileName = new TCHAR[MAX_PATHLEN];
+		int folderNodeId = target->NodeId;
+		_stprintf_s(txtOldFileName, MAX_PATHLEN, _T("node%d_ver%d.txt"), folderNodeId, this->VersionControl);
+		auto res = _tfopen_s(&tmp, txtOldFileName, L"r");
+		if (res) {
+			//记录的文件不存在,创建一个记录
+			this->DumpDirInfo(target, txtOldFileName);
+			//将更新的节点的NodeId记录下来以便后续扫描
+			this->UpdatedNodes.push(folderNodeId);
+		}
+		*/
 		//新增文件节点
 		Node* newNode = new Node(Size, LastModifiedTime, (DWORD(FILE_ATTRIBUTE_NORMAL)), target->Depth + 1, this->IdAccumulator++, Path);
 		if (target->Child) {
@@ -408,6 +439,7 @@ int DirectoryTree::DeleteNode(Node* p)
 	if (!p) {
 		return -1;
 	}
+	this->NodeMap.erase(p->NodeId);
 	Node* isoTreeRoot = p->Child;//删除节点后可能会有一棵被独立出来的树
 	if (!(p->RealParent)) {
 		//根节点，直接删了
@@ -437,7 +469,7 @@ int DirectoryTree::DeleteNode(Node* p)
 			//层次遍历并删除节点
 			Node* curNode = nodesToDelete.front();
 			nodesToDelete.pop();
-			if (curNode->Child)  nodesToDelete.push(curNode->Child); 
+			if (curNode->Child)  nodesToDelete.push(curNode->Child);
 			if (curNode->Sibling) nodesToDelete.push(curNode->Sibling);
 			//统计数量
 			curNode->FileAttribute& FILE_ATTRIBUTE_DIRECTORY ?
@@ -450,3 +482,50 @@ int DirectoryTree::DeleteNode(Node* p)
 }
 #pragma endregion
 
+/// <summary>
+/// 将节点p的目录信息格式化输出为txt文件
+/// </summary>
+/// <param name="p"></param>
+/// <returns></returns>
+int DirectoryTree::DumpDirInfo(Node* p,TCHAR* txtFileName)
+{
+	TCHAR buf[MAX_PATHLEN * 10];
+	//遍历以该节点为根的目录树
+	std::queue<Node*> nodesToDump;
+	nodesToDump.push(p);
+	FILE* txtFp;
+	_tfopen_s(&txtFp, txtFileName, L"w,ccs=UTF-8");
+	while (nodesToDump.size()) {
+		Node* now = nodesToDump.front();
+		nodesToDump.pop();
+		//输出
+		_stprintf_s(buf, MAX_PATHLEN * 10,
+			_T("##类型-%ls 路径： %ls \n大小:%lld 修改时间:%lld\n"),
+			now->FileAttribute&FILE_ATTRIBUTE_DIRECTORY ? _T("目录"):_T("文件"),
+			now->PathName,now->FileSize,now->ModifiedTime);
+		fwrite(buf, sizeof(TCHAR), _tcslen(buf), txtFp);
+		//为了能够以线性复杂度对比文件，要先统计完当层目录再统计下一层
+		if (now->Sibling) {
+			nodesToDump.push(now->Sibling);
+		}
+		if (now->Child) {
+			nodesToDump.push(now->Child);
+		}
+	}
+	txtFp ? fclose(txtFp):0;
+	return 0;
+}
+
+/// <summary>
+/// 用NodeID获取对应的Node对象，失败返回NULL
+/// </summary>
+/// <param name="NodeId"></param>
+/// <returns></returns>
+Node* DirectoryTree::GetNodeById(int NodeId)
+{
+	auto it = NodeMap.find(NodeId);
+	if (it != NodeMap.end()) {
+		return it->second;
+	}
+	return NULL;
+}

@@ -7,7 +7,12 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800">
     <Grid>
-        <Button Content="选择文件" Name="btnSelectFile"  Click="ButtonClicked" RenderTransformOrigin="0.5,0.5" Margin="34,144,510,240"/>
+        <Button Content="选择文件" Name="btnSelectFile"  Click="ButtonClicked" RenderTransformOrigin="0.5,0.5" Margin="32,147,511,235"/>
         <Button Content="选择目录并扫描" Name ="btnScanDir"  HorizontalAlignment="Left" Margin="32,70,0,0" VerticalAlignment="Top" Height="54" Width="257" Click ="ButtonClicked"/>
+        <TextBox HorizontalAlignment="Left" Height="0" Margin="419,79,0,0" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Top" Width="0"/>
+        <Label Content="选中的目录"  HorizontalAlignment="Left" Margin="331,79,0,0" VerticalAlignment="Top"/>
+        <Label Content="{Binding DirSelected,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" Name="lbDirSelected" HorizontalAlignment="Left" Margin="424,79,0,0" VerticalAlignment="Top"/>
+        <Label Content="当前状态" HorizontalAlignment="Left" Margin="342,161,0,0" VerticalAlignment="Top"/>
+        <Label Content="正常" Name ="lbStatus"  HorizontalAlignment="Left" Margin="429,161,0,0" VerticalAlignment="Top"/>
     </Grid>
 </Window>
