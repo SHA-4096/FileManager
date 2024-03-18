@@ -5,14 +5,41 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FileManagerGui"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="FileManager" Height="514" Width="945">
     <Grid>
-        <Button Content="选择文件" Name="btnSelectFile"  Click="ButtonClicked" RenderTransformOrigin="0.5,0.5" Margin="32,147,511,235"/>
-        <Button Content="选择目录并扫描" Name ="btnScanDir"  HorizontalAlignment="Left" Margin="32,70,0,0" VerticalAlignment="Top" Height="54" Width="257" Click ="ButtonClicked"/>
-        <TextBox HorizontalAlignment="Left" Height="0" Margin="419,79,0,0" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Top" Width="0"/>
-        <Label Content="选中的目录"  HorizontalAlignment="Left" Margin="331,79,0,0" VerticalAlignment="Top"/>
-        <Label Content="{Binding DirSelected,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" Name="lbDirSelected" HorizontalAlignment="Left" Margin="424,79,0,0" VerticalAlignment="Top"/>
-        <Label Content="当前状态" HorizontalAlignment="Left" Margin="342,161,0,0" VerticalAlignment="Top"/>
-        <Label Content="正常" Name ="lbStatus"  HorizontalAlignment="Left" Margin="429,161,0,0" VerticalAlignment="Top"/>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="19*"/>
+            <ColumnDefinition Width="296*"/>
+        </Grid.ColumnDefinitions>
+        <Button Content="选择文件" Name="btnSelectFile"  Click="ButtonClicked" HorizontalAlignment="Left" Margin="32,142,0,0" VerticalAlignment="Top" Height="54" Width="257" Grid.ColumnSpan="2"/>
+        <Button Content="选择目录并扫描" Name ="btnScanDir"  HorizontalAlignment="Left" Margin="32,73,0,0" VerticalAlignment="Top" Height="54" Width="257" Click ="ButtonClicked" Grid.ColumnSpan="2"/>
+        <Button Content="前往上层目录" Name="btnParentDir" Click="ButtonClicked" HorizontalAlignment="Left" Margin="738,216,0,0" VerticalAlignment="Top" Height="33" Width="98" Grid.Column="1"/>
+        <TextBox HorizontalAlignment="Left" Height="0" Margin="362,79,0,0" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Top" Width="0" Grid.Column="1"/>
+        <Label Content="扫描的目录"  HorizontalAlignment="Left" Margin="274,79,0,0" VerticalAlignment="Top" Grid.Column="1"/>
+        <Label Content="{Binding DirSelected,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" Name="lbDirSelected" HorizontalAlignment="Left" Margin="367,79,0,0" VerticalAlignment="Top" Grid.Column="1"/>
+        <Label Content="当前状态" HorizontalAlignment="Left" Margin="280,142,0,0" VerticalAlignment="Top" Grid.Column="1"/>
+        <Label Content="正常" Name ="lbStatus"  HorizontalAlignment="Left" Margin="372,142,0,0" VerticalAlignment="Top" Grid.Column="1"/>
+        <Button Content="全量监视选中目录" Name ="btnFullDiff" Click="ButtonClicked"  HorizontalAlignment="Left" Margin="738,274,0,0" VerticalAlignment="Top" Height="38" Width="98" Grid.Column="1"/>
+        <ListView d:ItemsSource="{d:SampleData ItemCount=5}" Margin="32,217,155,30" SelectionChanged="ListView_SelectionChanged" Name="listExplorer" MouseDoubleClick="Listview_MouseDoubleClicked" Grid.ColumnSpan="2">
+            <ListView.Effect>
+                <DropShadowEffect/>
+            </ListView.Effect>
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <Button Content="统计全量差异" Name="btnBeginFullDiffCmp" Click="ButtonClicked" HorizontalAlignment="Left" Margin="738,343,0,0" VerticalAlignment="Top" Height="41" Width="98" Grid.Column="1"/>
+        <Button Content="统计目录属性差异" Name="btnBeginFolderStatCmp" Click="ButtonClicked" HorizontalAlignment="Left" Margin="738,413,0,0" VerticalAlignment="Top" Height="41" Width="98" Grid.Column="1"/>
+        <Label Content="当前选中的目录" HorizontalAlignment="Left" Margin="609,83,0,0" VerticalAlignment="Top" Grid.Column="1"/>
+        <Viewbox Margin="607,114,10,286" Grid.Column="1">
+            <StackPanel Orientation="Vertical" Width="400">
+                <TextBlock x:Name="textblockDir" 
+                   FontSize="20" 
+                   TextWrapping="Wrap" 
+                   Foreground="Black" />
+            </StackPanel>
+        </Viewbox>
     </Grid>
 </Window>

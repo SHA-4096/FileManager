@@ -7,10 +7,10 @@
 /// </summary>
 /// <param name="TableName"></param>
 SqlScript::SqlScript(TCHAR* TableName) {
-	fp = nullptr;
-	fopen_s(&fp, "script.sql", "wb");
+	//fp = nullptr;
+	//fopen_s(&fp, "script.sql", "wb");
 	TCHAR buf[MAX_PATHLEN*10];
-	swprintf_s(buf, MAX_PATHLEN * 10,_T("SET sql_mode = NO_BACKSLASH_ESCAPES;\n"));//取消转义
+	swprintf_s(buf, MAX_PATHLEN * 10,_T("SET sql_mode=\'NO_BACKSLASH_ESCAPES\';\n"));//取消转义
 	swprintf_s(buf, MAX_PATHLEN*10,_T("%lsDROP TABLE IF EXISTS `%ls`;\n"), buf,TableName);
 	swprintf_s(buf, MAX_PATHLEN * 10, _T("%ls"
 		"CREATE TABLE %ls ("
@@ -22,15 +22,16 @@ SqlScript::SqlScript(TCHAR* TableName) {
 		"file_attr INT,"
 		"modified_time BIGINT,"
 		"size BIGINT"
-		");"),
+		");\n"),
 		buf,TableName
 	);
+	this->OpenScriptFp();
 	this->AppendScript(buf);
 	_tcscpy_s(this->TableName, TableName);
 }
 
 SqlScript::~SqlScript() {
-	fclose(fp);
+	
 }
 
 /// <summary>
@@ -42,12 +43,17 @@ SqlScript::~SqlScript() {
 /// <param name="host"></param>
 /// <param name="port"></param>
 /// <returns></returns>
-int SqlScript::InitScript(/*char* exePath, char* uName, char* pwd, char* host, char* port*/) {
+int SqlScript::OpenScriptFp() {
+	this->CurrentWroteCount++;
+	_stprintf_s(this->FileName, MAX_PATHLEN, _T("script_%d.sql"), this->CurrentFileCount++);
+	fp ? fclose(fp) : 0;
+	_tfopen_s(&fp, this->FileName, _T("a,ccs=UTF-8"));
+	this->WritingActive = true;
 	return 0;
 }
 
 /// <summary>
-/// 新增节点，时间格式化之后以字符串存储
+/// 新增节点，时间用INT64存储
 /// </summary>
 /// <param name="path"></param>
 /// <param name="attr"></param>
@@ -56,14 +62,14 @@ int SqlScript::InitScript(/*char* exePath, char* uName, char* pwd, char* host, c
 /// <param name="sibling"></param>
 /// <param name="parent"></param>
 /// <returns></returns>
-int SqlScript::AddNode(int NodeId,TCHAR* Path, DWORD Attr, INT64 Time, INT64 Size,int Child, int Sibling, int Parent)
+int SqlScript::AddNode(int NodeId,TCHAR* Path, DWORD Attr, UINT64 Time, INT64 Size,int Child, int Sibling, int Parent)
 {
 	auto SysTime = new SYSTEMTIME();
 	//FileTimeToSystemTime(&time, SysTime);
 	TCHAR buf[MAX_PATHLEN*2];
 	//auto formattedTime = new TCHAR[20];
 	//_stprintf_s(formattedTime, 20, _T("%d-%d-%d"), SysTime->wYear, SysTime->wMonth, SysTime->wDay);
-	_stprintf_s(buf, MAX_PATHLEN*2, _T("INSERT INTO `%ls` (`node_id`,`full_path`, `file_attr`, `modified_time`, `child`, `sibling`, `parent` ,`size` ) VALUES (%d ,'%ls', %d, %lld, %d, %d, %d, %lld);\n"), 
+	_stprintf_s(buf, MAX_PATHLEN*2, _T("INSERT INTO %ls (`node_id`,`full_path`, `file_attr`, `modified_time`, `child`, `sibling`, `parent` ,`size` ) VALUES (%d ,'%ls', %d, %llu, %d, %d, %d, %lld);\n"), 
 		this->TableName,NodeId,Path, Attr, Time, Child, Sibling, Parent,Size);
 	this->AppendScript(buf);
 	return 0;
@@ -79,19 +85,36 @@ int SqlScript::AddNode(int NodeId,TCHAR* Path, DWORD Attr, INT64 Time, INT64 Siz
 /// <returns></returns>
 int SqlScript::UpdateRelation(Node* p) {
 	TCHAR buf[MAX_PATHLEN * 2];
-	_stprintf_s(buf, MAX_PATHLEN * 2, _T("UPDATE `%ls` SET `child` = %d, `sibling` = %d, `parent` = %d WHERE `node_id` = %d;\n"),
+	_stprintf_s(buf, MAX_PATHLEN * 2, _T("UPDATE %ls SET `child` = %d, `sibling` = %d, `parent` = %d WHERE `node_id` = %d;\n"),
 		this->TableName,CHILD_ID(p), SIBLING_ID(p), PARENT_ID(p), SELF_ID(p));
 	AppendScript(buf);
 	return 0;
 }
 
+int SqlScript::CloseScriptFp()
+{
+	this->WritingActive = false;
+	fclose(fp);
+	return 0;
+}
+
 /// <summary>
-/// 向文件中写入buf，成功返回0
+/// 向文件中写入buf，成功返回0;实现文件分块逻辑
 /// </summary>
 /// <param name="buf"></param>
 /// <returns></returns>
 int SqlScript::AppendScript(TCHAR* buf) {
+	if(!this->WritingActive) return -1;
+	//每MAX_SQL_LINES次写入就换一个文件
+	if (!this->CurrentWroteCount) {
+		_stprintf_s(this->FileName, MAX_PATHLEN, _T("script_%d.sql"), this->CurrentFileCount++);
+		fp ? fclose(fp) : 0;
+		_tfopen_s(&fp, this->FileName, _T("a,ccs=UTF-8"));
+	}
 	fwrite(buf, sizeof(TCHAR), _tcslen(buf), fp);
+	if (this->CurrentWroteCount++ > MAX_SQL_LINES) {
+		this->CurrentWroteCount = 0;
+	}
 	return 0;
 }
 #pragma endregion
@@ -100,7 +123,15 @@ int SqlScript::AppendScript(TCHAR* buf) {
 
 Node::Node(WIN32_FIND_DATA* Data, int Depth, int NodeId, TCHAR* PathName) {
 	this->FileAttribute = Data->dwFileAttributes;
-	this->ModifiedTime = Data->ftLastWriteTime.dwLowDateTime + Data->ftLastWriteTime.dwHighDateTime * (MAXDWORD + 1);
+	//将时间转换为秒数
+	ULARGE_INTEGER uli;//为了避免对齐错误，不能直接进行简单运算获得ModifiedTime
+	uli.LowPart = Data->ftLastWriteTime.dwLowDateTime;
+	uli.HighPart = Data->ftLastWriteTime.dwHighDateTime;
+	this->ModifiedTime = uli.QuadPart;
+	this->ModifiedTime /= 10000000;//转换为秒(FILETIME的单位是100ns)
+	//转换为UNIX时间
+	this->ModifiedTime -= WINDOWS_UNIX_TIME_DIFF;
+
 	this->FileSize = (Data->nFileSizeHigh * (MAXDWORD + 1)) + Data->nFileSizeLow;
 	//this->FileSize /= (1024 * 1024);//以MB计
 	_tcscpy_s(this->PathName, MAX_PATHLEN, PathName);
@@ -110,7 +141,7 @@ Node::Node(WIN32_FIND_DATA* Data, int Depth, int NodeId, TCHAR* PathName) {
 	this->Sibling = NULL;
 }
 
-Node::Node(INT64 Size, INT64 ModifiedTime, DWORD FileAttribute,int Depth, int NodeId, TCHAR* PathName)
+Node::Node(INT64 Size, UINT64 ModifiedTime, DWORD FileAttribute,int Depth, int NodeId, TCHAR* PathName)
 {
 	this->FileAttribute = FileAttribute;
 	this->ModifiedTime = ModifiedTime;
@@ -129,7 +160,7 @@ Node::Node(INT64 Size, INT64 ModifiedTime, DWORD FileAttribute,int Depth, int No
 /// </summary>
 /// <param name="RootName"></param>
 DirectoryTree::DirectoryTree(TCHAR* RootPath) {
-	this->Script = new SqlScript(_T("test"));
+	this->Script = new SqlScript(_T("Nodes"));
 	setlocale(LC_ALL, "");
 	WIN32_FIND_DATA data;
 	TCHAR currentPath[MAX_PATHLEN];//用来做当前目录的搜索
@@ -195,6 +226,8 @@ DirectoryTree::DirectoryTree(TCHAR* RootPath) {
 			wprintf(L"FindFirstFile failed at %ls\n", currentPath);
 		}
 	}
+	//扫描完成，释放文件指针
+	this->Script->CloseScriptFp();
 
 }
 
@@ -214,14 +247,6 @@ int DirectoryTree::GetDirectoryInfo(Node* p,Node** FileOldest,Node** FileNewest,
 		FILE* tmp = NULL;
 		TCHAR* txtOldFileName = new TCHAR[MAX_PATHLEN];
 		int folderNodeId = p->NodeId;
-		//_stprintf_s(txtOldFileName, MAX_PATHLEN, _T("node%d_ver%d.txt"), folderNodeId, this->VersionControl);
-		//auto res = _tfopen_s(&tmp, txtOldFileName, L"r");
-		//if (res) {
-			//记录的文件不存在,创建一个记录
-			//this->DumpDirInfo(p, txtOldFileName);
-			//将更新的节点的NodeId记录下来以便后续扫描
-			//this->UpdatedNodes.push_back(folderNodeId);
-		//}
 
 		Node* now = p->Child;
 		Node* newest = NULL;
@@ -293,20 +318,6 @@ int DirectoryTree::AlterNode(TCHAR* Path, TCHAR* Mode, INT64 LastModifiedTime, I
 		if (fileTarget) {
 			return -1;
 		}
-		/*
-		//之前没有记录过，则记录当前目录下的文件信息
-		FILE* tmp = NULL;
-		TCHAR* txtOldFileName = new TCHAR[MAX_PATHLEN];
-		int folderNodeId = target->NodeId;
-		_stprintf_s(txtOldFileName, MAX_PATHLEN, _T("node%d_ver%d.txt"), folderNodeId, this->VersionControl);
-		auto res = _tfopen_s(&tmp, txtOldFileName, L"r");
-		if (res) {
-			//记录的文件不存在,创建一个记录
-			this->DumpDirInfo(target, txtOldFileName);
-			//将更新的节点的NodeId记录下来以便后续扫描
-			this->UpdatedNodes.push(folderNodeId);
-		}
-		*/
 		//新增文件节点
 		Node* newNode = new Node(Size, LastModifiedTime, (DWORD(FILE_ATTRIBUTE_NORMAL)), target->Depth + 1, this->IdAccumulator++, Path);
 		if (target->Child) {
@@ -396,7 +407,7 @@ int DirectoryTree::AddSibling(Node* base, Node* target) {
 		p = p->Sibling;
 	}
 	p->Sibling = target;
-	target->RealDep = p->RealDep + 1;
+	target->RealDep = p->RealDep + 1;	
 	target->Parent = base->Parent;
 	target->RealParent = p;
 	//更新最大深度
@@ -439,10 +450,10 @@ int DirectoryTree::DeleteNode(Node* p)
 	if (!p) {
 		return -1;
 	}
-	this->NodeMap.erase(p->NodeId);
 	Node* isoTreeRoot = p->Child;//删除节点后可能会有一棵被独立出来的树
 	if (!(p->RealParent)) {
 		//根节点，直接删了
+		this->NodeMap.erase(p->NodeId);
 		delete p;
 	}
 	else {
@@ -458,6 +469,7 @@ int DirectoryTree::DeleteNode(Node* p)
 		//统计数量
 		p->FileAttribute & FILE_ATTRIBUTE_DIRECTORY ?
 			this->DirCount-- : this->FileCount--;
+		this->NodeMap.erase(p->NodeId);
 		//释放内存
 		delete p;
 	}
@@ -474,12 +486,16 @@ int DirectoryTree::DeleteNode(Node* p)
 			//统计数量
 			curNode->FileAttribute& FILE_ATTRIBUTE_DIRECTORY ?
 				this->DirCount-- : this->FileCount--;
+			this->NodeMap.erase(curNode->NodeId);
 			//释放内存
 			delete curNode;
+
 		}
 	}
 	return 0;
 }
+
+
 #pragma endregion
 
 /// <summary>
@@ -492,20 +508,23 @@ int DirectoryTree::DumpDirInfo(Node* p,TCHAR* txtFileName)
 	TCHAR buf[MAX_PATHLEN * 10];
 	//遍历以该节点为根的目录树
 	std::queue<Node*> nodesToDump;
+	Node* tmpRoot = p;
 	nodesToDump.push(p);
 	FILE* txtFp;
 	_tfopen_s(&txtFp, txtFileName, L"w,ccs=UTF-8");
 	while (nodesToDump.size()) {
 		Node* now = nodesToDump.front();
 		nodesToDump.pop();
+		TCHAR formattedTime[100];
+		unixTimeToFormattedString(now->ModifiedTime, formattedTime);
 		//输出
 		_stprintf_s(buf, MAX_PATHLEN * 10,
-			_T("##类型-%ls 路径： %ls \n大小:%lld 修改时间:%lld\n"),
+			_T("##类型-%ls 路径： %ls \n大小:%lld 修改时间:%ls\n"),
 			now->FileAttribute&FILE_ATTRIBUTE_DIRECTORY ? _T("目录"):_T("文件"),
-			now->PathName,now->FileSize,now->ModifiedTime);
+			now->PathName,now->FileSize,formattedTime);
 		fwrite(buf, sizeof(TCHAR), _tcslen(buf), txtFp);
 		//为了能够以线性复杂度对比文件，要先统计完当层目录再统计下一层
-		if (now->Sibling) {
+		if (now->Sibling && now != p) {//要避免将同级其余目录统计进去
 			nodesToDump.push(now->Sibling);
 		}
 		if (now->Child) {

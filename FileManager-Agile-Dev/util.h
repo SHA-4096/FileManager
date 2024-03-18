@@ -3,8 +3,9 @@
 #include<windows.h>
 #define MAX_PATHLEN 1000
 
+#define WINDOWS_UNIX_TIME_DIFF 1164447360
+
 int lowerCaseCmp(TCHAR* str1, TCHAR* str2);
 TCHAR* lowerCaseContain(TCHAR* str1, TCHAR* str2);
-int cmpDiff(TCHAR* PathOrigin, TCHAR* PathNew, TCHAR* Pathresult);
 int dumpFolderStat(TCHAR* txtFileName, TCHAR* buf);
-int cmpFolderDiff(TCHAR* PathOrigin, TCHAR* PathNew, TCHAR* Pathresult);
+int unixTimeToFormattedString(UINT64 UnixTime, TCHAR* buf);

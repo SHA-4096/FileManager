@@ -9,10 +9,22 @@ int ControllerClass::SetCommandScript(TCHAR* FileName) {
 
 int ControllerClass::ScanDir(TCHAR* Path) {
 	this->DirTree = new DirectoryTree(Path);
-	//DEBUG
-	this->DirTree->DumpDirInfo(this->DirTree->GetNodeById(1), _T("node1_ver0.txt"));
-	this->FullDiffNodes.push_back(1);
-	//END DEBUG
+	TCHAR ScanResult[MAX_PATHLEN * 5];
+	_stprintf_s(this->WriteBuf, 
+		_T(
+			"==========扫描结果==========\n"
+			"扫描目录:%ls\n"
+			"文件夹数量(含根目录)：%d\n"
+			"文件数量(含根文件)：%d\n"
+			"最长的目录名：%ls\n"
+			"最长的目录长度：%d\n"
+			"最大目录层数：%d\n"
+			"实际目录树层数：%d\n"
+			"============================\n"
+		), Path,this->DirTree->DirCount,
+		this->DirTree->FileCount,this->DirTree->LongestFullPath,_tcslen(this->DirTree->LongestFullPath),
+		this->DirTree->MaxDepth, this->DirTree->MaxRealDepth);
+	this->WriteResult();
 	return 0;
 }
 
@@ -55,80 +67,26 @@ int ControllerClass::ExecuteCommand() {
 				//目录修改（只有删除）操作
 				Args[0][_tcslen(Args[0]) - 1] = _T('\0');//去掉末尾的\号
 				if (!this->DirTree->AlterNode(Args[0],Args[1],0,0 )) {
-					_stprintf_s(this->WriteBuf, _T("已删除目录:%ls\n"), Args[0]);
+					//_stprintf_s(this->WriteBuf, _T(">>>>[ACTION]已删除目录:%ls\n"), Args[0]);
 				}
 				else {
-					_stprintf_s(this->WriteBuf, _T("未找到目录:%ls\n"), Args[0]);
+					_stprintf_s(this->WriteBuf, _T(">>>>[ACTION]未找到目录:%ls\n"), Args[0]);
+					this->WriteResult();
 				}
 				break;
 			case MODE_MYFILE:
 				//文件修改（删除，修改大小，新增）操作
-				if (!this->DirTree->AlterNode(Args[0], Args[1], _ttoi(Args[2]), _ttoi(Args[3]))) {
-					_stprintf_s(this->WriteBuf, _T("已对文件%ls进行[%ls]操作\n"), Args[0],Args[1]);
+				if (!this->DirTree->AlterNode(Args[0], Args[1], _ttoi64(Args[2]), _ttoi64(Args[3]))) {
+					//_stprintf_s(this->WriteBuf, _T(">>>>[ACTION]已对文件%ls进行[%ls]操作\n"), Args[0],Args[1]);
 				}
 				else {
-					_stprintf_s(this->WriteBuf, _T("找不到文件:%ls\n"), Args[0]);
+					_stprintf_s(this->WriteBuf, _T(">>>>[ACTION]找不到文件:%ls\n"), Args[0]);
+					this->WriteResult();
 				}
 				break;
 			default:
 				return -1;
 		}
-		auto err = this->WriteResult();
-	}
-	//进行信息统计
-	//遍历UpdatedNodes
-	/*if (mode != MODE_MYSTAT) {
-		for (int index = 0; index < this->DirTree->UpdatedNodes.size(); index++) {
-			int nodeId = this->DirTree->UpdatedNodes[index];
-			TCHAR txtNewFileName[MAX_PATHLEN];
-			_stprintf_s(txtNewFileName, _T("node%d_ver%d.txt"), nodeId, this->DirTree->VersionControl + 1);
-			TCHAR txtOldFileName[MAX_PATHLEN];
-			_stprintf_s(txtOldFileName, _T("node%d_ver%d.txt"), nodeId, this->DirTree->VersionControl);
-			this->DirTree->DumpDirInfo(this->DirTree->GetNodeById(nodeId), txtNewFileName);
-			cmpDiff(txtOldFileName, txtNewFileName, L"cmp_result.txt");
-		}
-	}*/
-	if (mode != MODE_MYSTAT) {
-		//对于FolderStatNodes,只需比较目录差异就行
-		TCHAR txtFileNameOld[MAX_PATHLEN], txtFileNameNew[MAX_PATHLEN];
-		_stprintf_s(txtFileNameOld, _T("folders_ver%d.txt"), 0);
-		_stprintf_s(txtFileNameNew, _T("folders_ver%d.txt"), this->DirTree->VersionControl);
-		for (int index = 0; index < this->FolderStatNodes.size(); index++) {
-			this->DirTree->VersionControl++;//先设置新的版本号
-			int NodeId = this->FolderStatNodes[index];
-			Node* target = this->DirTree->GetNodeById(NodeId);
-			if (!target) {
-				continue;
-			}
-			else {
-				this->GetFolderStat(target->PathName);
-			}
-			
-			this->DirTree->VersionControl--;//恢复旧的版本号
-		}
-		this->CmpFolderDiff(txtFileNameOld, txtFileNameNew);
-
-		//对于FullDiffNodes,需要比较其所有子节点的差异
-		TCHAR txtFileNameResult[MAX_PATHLEN];
-		for (int index = 0; index < this->FullDiffNodes.size(); index++) {
-			this->DirTree->VersionControl++;//设置新的版本号
-			int NodeId = this->FullDiffNodes[index];			
-			Node* target = this->DirTree->GetNodeById(NodeId);
-			if (!target) {
-				continue;
-			}
-			else {
-				_stprintf_s(txtFileNameNew, _T("node%d_ver%d.txt"), target->NodeId, this->DirTree->VersionControl);
-				this->DirTree->DumpDirInfo(target, txtFileNameNew);
-			}
-			_stprintf_s(txtFileNameOld, _T("node%d_ver%d.txt"), target->NodeId, 0);
-			_stprintf_s(txtFileNameResult, _T("noed%d_full_compare_result.txt"), target->NodeId);
-			//this->CmpFullDiff(txtFileNameOld, txtFileNameNew, txtFileNameResult);
-			cmpDiff(txtFileNameOld, txtFileNameNew, txtFileNameResult);
-			this->DirTree->VersionControl--;//恢复旧的版本号
-		}
-		//此次操作结束，更新版本号
-		this->DirTree->VersionControl++;
 	}
 	return 0;
 }
@@ -139,7 +97,7 @@ int ControllerClass::ExecuteCommand() {
 int ControllerClass::CommandTrim() {
 	TCHAR* head = ReadBuf;
 	TCHAR* tail = head;
-	int argIndex = 0;
+	int argIndex = 0; 
 	while (*tail != _T('\n') && !feof(ReadFp)) {
 		if (*tail == _T(',')) {
 			//到分界点
@@ -171,18 +129,17 @@ int ControllerClass::GetFolderStat(TCHAR* Path) {
 		return -1;
 	}
 	this->DirTree->GetDirectoryInfo(target, &oldest, &newest, &count, &filesize);
-	//this->DirTree->UpdatedNodes.push_back(target->NodeId);
 	swprintf_s(this->WriteBuf, 
 		_T(
 			"目录:%ls\n"
-			"时间最早的文件：%ls  "
-			"时间最晚的文件：%ls  "
-			"目录下的文件总数：%d  "
-			"目录下的文件大小总和：%lld (bytes)  \n"
+			"最早：%ls  "
+			"最晚：%ls  "
+			"文件总数：%d  "
+			"大小总和：%lld (bytes)  \n"
 		),
 		target->PathName,oldest->PathName,newest->PathName,count,filesize);
 	TCHAR txtFileName[MAX_PATHLEN];
-	_stprintf_s(txtFileName, _T("folders_ver%d.txt"),this->DirTree->VersionControl);
+	_stprintf_s(txtFileName, _T("folders_ver%d.txt"),this->DirTree->FolderStatVersionControl);
 	dumpFolderStat(txtFileName, this->WriteBuf);
 	return target->NodeId;
 }
@@ -203,7 +160,58 @@ int ControllerClass::WriteResult()
 }
 
 int ControllerClass::Debug() {
-	cmpDiff(_T("node397.txt"), _T("node397new.txt"), _T("AAA_RES.txt"));
+	//cmpDiff(_T("node397.txt"), _T("node397new.txt"), _T("AAA_RES.txt"));
+	return 0;
+}
+
+int ControllerClass::BeginFolderStatCompare()
+{
+	//对于FolderStatNodes,只需比较目录差异就行
+	TCHAR txtFileNameOld[MAX_PATHLEN], txtFileNameNew[MAX_PATHLEN];
+	this->DirTree->FolderStatVersionControl++;//先设置新的版本号
+	_stprintf_s(txtFileNameOld, _T("folders_ver%d.txt"), 0);
+	_stprintf_s(txtFileNameNew, _T("folders_ver%d.txt"), this->DirTree->FolderStatVersionControl);
+	for (int index = 0; index < this->FolderStatNodes.size(); index++) {
+
+		int NodeId = this->FolderStatNodes[index];
+		Node* target = this->DirTree->GetNodeById(NodeId);
+		if (!target) {
+			continue;
+		}
+		else {
+			this->GetFolderStat(target->PathName);
+		}
+
+		
+	}
+	this->CmpFolderDiff(txtFileNameOld, txtFileNameNew);//进行比较
+	return 0;
+}
+
+int ControllerClass::BeginFullDiffCompare()
+{
+	TCHAR txtFileNameOld[MAX_PATHLEN], txtFileNameNew[MAX_PATHLEN];
+	//对于FullDiffNodes,需要比较其所有子节点的差异
+	TCHAR txtFileNameResult[MAX_PATHLEN];
+	for (int index = 0; index < this->FullDiffNodes.size(); index++) {
+		this->DirTree->FullDiffVersionControl++;//设置新的版本号
+		int NodeId = this->FullDiffNodes[index];
+		Node* target = this->DirTree->GetNodeById(NodeId);
+		if (!target) {
+			continue;
+		}
+		else {
+			_stprintf_s(txtFileNameNew, _T("node%d_ver%d.txt"), target->NodeId, this->DirTree->FullDiffVersionControl);
+			this->DirTree->DumpDirInfo(target, txtFileNameNew);
+		}
+		_stprintf_s(txtFileNameOld, _T("node%d_ver%d.txt"), target->NodeId, 0);
+		_stprintf_s(txtFileNameResult, _T("noed%d_full_compare_result.txt"), target->NodeId);
+		//this->CmpFullDiff(txtFileNameOld, txtFileNameNew, txtFileNameResult);
+		this->CmpFullDiff(txtFileNameOld, txtFileNameNew, txtFileNameResult);
+		this->DirTree->FullDiffVersionControl--;//恢复旧的版本号
+	}
+	//更新版本号
+	this->DirTree->FullDiffVersionControl++;
 	return 0;
 }
 
@@ -227,6 +235,8 @@ int ControllerClass::CmpFolderDiff(TCHAR* PathOrigin, TCHAR* PathNew) {
 		return -1;
 	}
 	//逐行读取目录的统计信息并比较，找到不同的目录并输出更新的目录信息
+	_stprintf_s(this->WriteBuf, _T("==========开始目录比较==========\n"));
+	this->WriteResult();
 	while (1) {
 		_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
 		_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);
@@ -250,10 +260,6 @@ int ControllerClass::CmpFolderDiff(TCHAR* PathOrigin, TCHAR* PathNew) {
 			}
 			totalCnt++;
 		}
-		if (feof(fpOrigin) && feof(fpNew)&& _tcscmp(bufOrigin, bufNew)) {
-			//两个文件同时到达文件尾，且目录不同，则说明当前bufOrigin内的目录是被删除的，直接跳出循环
-			break;
-		}
 		if (_tcscmp(bufOriginAttr, bufNewAttr)) {
 			//目录相同，属性不同
 			_stprintf_s(this->WriteBuf, _T("【目录更新#%d】\n"), diffCnt++);
@@ -265,8 +271,11 @@ int ControllerClass::CmpFolderDiff(TCHAR* PathOrigin, TCHAR* PathNew) {
 	}
 	_stprintf_s(this->WriteBuf, _T("比较了%d个目录,共有%d个目录更新\n"), totalCnt, diffCnt);
 	this->WriteResult();
+	_stprintf_s(this->WriteBuf, _T("==========结束目录比较==========\n"));
+	this->WriteResult();
 	fclose(fpOrigin);
 	fclose(fpNew);
+	return 0;
 }
 
 /// <summary>
@@ -275,84 +284,98 @@ int ControllerClass::CmpFolderDiff(TCHAR* PathOrigin, TCHAR* PathNew) {
 /// <param name="PathOrigin"></param>
 /// <param name="PathNew"></param>
 /// <returns></returns>
-int ControllerClass::CmpFullDiff(TCHAR* PathOrigin, TCHAR* PathNew, TCHAR* OutputPath) {
-	int diffCnt = 0, totalCnt = 0;
-	FILE* fpOrigin, * fpNew,*fpResult;
-	TCHAR bufOrigin[MAX_PATHLEN], bufNew[MAX_PATHLEN],bufResult[MAX_PATHLEN];
+int ControllerClass::CmpFullDiff(TCHAR* PathOrigin, TCHAR* PathNew, TCHAR* PathResult) {
+	FILE* fpOrigin, * fpNew, * fpResult;
+	fpos_t posOrigin, posNew;
+	TCHAR bufOrigin[MAX_PATHLEN], bufNew[MAX_PATHLEN], bufResult[MAX_PATHLEN];
 	TCHAR bufOriginAttr[MAX_PATHLEN], bufNewAttr[MAX_PATHLEN];
 	_tfopen_s(&fpOrigin, PathOrigin, _T("r,ccs=UTF-8"));
 	_tfopen_s(&fpNew, PathNew, _T("r,ccs=UTF-8"));
-	_tfopen_s(&fpResult, OutputPath, _T("a,ccs=UTF-8"));
-	if (!fpOrigin || !fpNew) {
-		fpOrigin ? fclose(fpOrigin) : 0;
-		fpNew ? fclose(fpNew) : 0;
-		fpResult ? fclose(fpResult) : 0;
+	_tfopen_s(&fpResult, PathResult, _T("a,ccs=UTF-8"));
+
+	_ftprintf(fpResult, _T("=================开始比较================\n"));
+	fgetpos(fpOrigin, &posOrigin);
+	fgetpos(fpNew, &posNew);
+
+	if (!fpOrigin || !fpNew || !fpResult) {
 		//打开文件失败
 		return -1;
 	}
-	//逐行读取目录的统计信息并比较，找到不同的目录并输出更新的目录信息
-	while (1) {
-		_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
-		_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);
-		_fgetts(bufNew, MAX_PATHLEN, fpNew);
-		_fgetts(bufNewAttr, MAX_PATHLEN, fpNew);
-		if (feof(fpOrigin)) {
-			//原文件所有记录都比较完了，直接退出
-			break;
-		}
-		totalCnt++;
-		while (_tcscmp(bufOrigin, bufNew) && !feof(fpOrigin)) {
-			//目录有差异说明该目录被删除
-			_stprintf_s(bufResult, _T("【节点更改#%d】\n"), diffCnt++);
-			_stprintf_s(bufResult, _T("%ls==被删除：%ls"), bufResult, bufOrigin);
-			fwrite(bufResult, sizeof(TCHAR), _tcslen(bufResult), fpResult);
-			_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
-			_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);
-			if (feof(fpOrigin)) {
-				//原文件所有记录都比较完了，直接退出
+	//读取文件，查找被修改和被删除的数据
+	//读取原始数据,奇数行只包含文件类型和文件名
+	_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
+	_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);//读取详细信息
+	// 对fpOrigin的每行记录，遍历fpNew，找到相同的记录
+	while (!feof(fpOrigin)) {
+		//读取新数据
+		fsetpos(fpNew, &posNew);
+		bool found = false;
+		while (!feof(fpNew)) {
+			_fgetts(bufNew, MAX_PATHLEN, fpNew);
+			_fgetts(bufNewAttr, MAX_PATHLEN, fpNew);//读取详细信息
+			//auto res = _tcscmp(bufOrigin, bufNew);
+			int cmp = _tcscmp(bufOrigin, bufNew);
+			if (!cmp) {
+				found = true;
 				break;
 			}
-			totalCnt++;
 		}
-		if (_tcscmp(bufOriginAttr, bufNewAttr)) {
-			//目录相同，属性不同
-			_stprintf_s(bufResult, _T("【目录更新#%d】\n"), diffCnt++);
-			_stprintf_s(bufResult, _T("%ls==目录名：%ls"), bufResult, bufOrigin);
-			_stprintf_s(bufResult, _T("%ls==更新前属性：%ls"), bufResult, bufOriginAttr);
-			_stprintf_s(bufResult, _T("%ls==更新后属性：%ls"), bufResult, bufNewAttr);
-			fwrite(bufResult, sizeof(TCHAR), _tcslen(bufResult), fpResult);
+		if (!found) {
+			//没找到相同的记录
+			_ftprintf(fpResult, _T("被删除:%ls\n"), bufOrigin);
 		}
-	}
-	//反过来查找新增的节点
-	FILE* tmp = fpOrigin;
-	fpOrigin = fpNew;
-	fpNew = tmp;
-	while (1) {
-		_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
-		_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);
-		_fgetts(bufNew, MAX_PATHLEN, fpNew);
-		_fgetts(bufNewAttr, MAX_PATHLEN, fpNew);
-		if (feof(fpOrigin)) {
-			//原文件所有记录都比较完了，直接退出
-			break;
+		else {
+			//找到相同的记录，比较详细信息
+			if (_tcscmp(bufOriginAttr, bufNewAttr)) {
+				_ftprintf(fpResult, _T("被修改:%ls\n"), bufOrigin);
+				_ftprintf(fpResult, _T("==修改前:%ls\n"), bufOriginAttr);
+				_ftprintf(fpResult, _T("==修改后:%ls\n"), bufNewAttr);
+			}
 		}
-		totalCnt++;
-		while (_tcscmp(bufOrigin, bufNew) && !feof(fpOrigin)) {
-			//目录有差异说明该目录被删除
-			_stprintf_s(bufResult, _T("【节点更改#%d】\n"), diffCnt++);
-			_stprintf_s(bufResult, _T("%ls==新增节点：%ls"), bufResult, bufOrigin);
-			fwrite(bufResult, sizeof(TCHAR), _tcslen(bufResult), fpResult);
+		//尽可能多移动指针
+		do {
 			_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
-			_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);
-			if (feof(fpOrigin)) {
-				//原文件所有记录都比较完了，直接退出
+			_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);//读取详细信息
+			_fgetts(bufNew, MAX_PATHLEN, fpNew);
+			_fgetts(bufNewAttr, MAX_PATHLEN, fpNew);//读取详细信息
+		} while (!feof(fpOrigin) && !feof(fpNew) && !_tcscmp(bufOrigin, bufNew) && !_tcscmp(bufOriginAttr, bufNewAttr));
+
+	}
+	//接下来查找新增的数据
+	fsetpos(fpOrigin, &posOrigin);
+	fsetpos(fpNew, &posNew);
+	//读取原始数据,奇数行只包含文件类型和文件名
+	_fgetts(bufNew, MAX_PATHLEN, fpNew);
+	_fgetts(bufNewAttr, MAX_PATHLEN, fpNew);//读取详细信息
+	// 对fpNew的每行记录，遍历fpOrigin，找到相同的记录
+	while (!feof(fpNew)) {
+		//读取新数据
+		fsetpos(fpOrigin, &posOrigin);
+		bool found = false;
+		while (!feof(fpOrigin)) {
+			_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
+			_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);//读取详细信息
+			auto res = _tcscmp(bufNew, bufOrigin);
+			int cmp = _tcscmp(bufNew, bufOrigin);
+			if (!cmp) {
+				found = true;
 				break;
 			}
-			totalCnt++;
+
 		}
+		if (!found) {
+			//没找到相同的记录
+			_ftprintf(fpResult, _T("新增:%ls\n"), bufNew);
+		}
+		//尽可能多移动指针
+		do {
+			_fgetts(bufOrigin, MAX_PATHLEN, fpOrigin);
+			_fgetts(bufOriginAttr, MAX_PATHLEN, fpOrigin);//读取详细信息
+			_fgetts(bufNew, MAX_PATHLEN, fpNew);
+			_fgetts(bufNewAttr, MAX_PATHLEN, fpNew);//读取详细信息
+		} while (!feof(fpOrigin) && !feof(fpNew) && !_tcscmp(bufOrigin, bufNew) && !_tcscmp(bufOrigin, bufNew));
 	}
-	_stprintf_s(bufResult, _T("比较了%d个节点,共有%d个节点更新\n"), totalCnt, diffCnt);
-	this->WriteResult();
+	_ftprintf(fpResult, _T("=================结束比较================\n"));
 	fclose(fpOrigin);
 	fclose(fpNew);
 	fclose(fpResult);

@@ -24,6 +24,7 @@
     <ProjectGuid>{fbbefa78-cb0a-496f-a118-edb170b12d96}</ProjectGuid>
     <RootNamespace>FileManagerAgileDev</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>FileManager-Agile-Dev</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -163,22 +164,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="wrapper.cpp" />
     <ClCompile Include="model.cpp" />
-    <ClCompile Include="scanner.cpp" />
-    <ClCompile Include="scanner.h" />
     <ClCompile Include="controller.cpp" />
     <ClCompile Include="util.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wrapper.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="controller.h" />
     <ClInclude Include="util.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\README.md" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
